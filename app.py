@@ -1,52 +1,28 @@
-from flask import Flask, request, render_template
-import re
+from flask import Flask, render_template, request
 import dns.resolver
-import smtplib
+import socket
 
 app = Flask(__name__)
 
-def is_valid_format(email):
-    pattern = r'^[\w\.-]+@[\w\.-]+\.\w+$'
-    return re.match(pattern, email)
-
-def has_mx_record(domain):
+def verify_email(email):
     try:
+        domain = email.split('@')[1]
         records = dns.resolver.resolve(domain, 'MX')
-        return len(records) > 0
-    except:
-        return False
-
-def check_smtp(email):
-    domain = email.split('@')[1]
-    try:
-        mx_record = dns.resolver.resolve(domain, 'MX')[0].exchange.to_text()
-        server = smtplib.SMTP(timeout=5)
-        server.connect(mx_record)
-        server.helo()
-        server.mail('test@example.com')
-        code, _ = server.rcpt(email)
-        server.quit()
-        return code == 250
-    except:
+        mx_record = records[0].exchange.to_text()
+        # Try connecting to the mail server
+        socket.create_connection((mx_record, 25), timeout=5)
+        return True
+    except Exception:
         return False
 
 @app.route('/', methods=['GET', 'POST'])
 def index():
     result = None
+    email = ''
     if request.method == 'POST':
         email = request.form['email']
-        if not is_valid_format(email):
-            result = f"❌ Invalid format: {email}"
-        else:
-            domain = email.split('@')[1]
-            if not has_mx_record(domain):
-                result = f"❌ Domain has no MX record: {domain}"
-            else:
-                if check_smtp(email):
-                    result = f"✅ Email is likely deliverable: {email}"
-                else:
-                    result = f"⚠️ Format and MX are valid, but SMTP check failed (maybe temporary issue)"
-    return render_template('index.html', result=result)
+        result = verify_email(email)
+    return render_template('index.html', result=result, email=email)
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run(host='0.0.0.0', port=10000)
