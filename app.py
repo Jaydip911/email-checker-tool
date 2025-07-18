@@ -1,41 +1,50 @@
-from flask import Flask, request, jsonify, render_template
-import re
+from flask import Flask, request, jsonify
 import dns.resolver
+import re
+import json
 
 app = Flask(__name__)
 
-def validate_email_syntax(email):
-    regex = r"^[^@\s]+@[^@\s]+\.[^@\s]+$"
-    return re.match(regex, email)
+DISPOSABLE_DOMAINS = set([
+    "mailinator.com", "10minutemail.com", "guerrillamail.com",
+    "tempmail.com", "yopmail.com", "trashmail.com", "sharklasers.com"
+])
 
-def has_mx_record(domain):
+EMAIL_REGEX = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+
+def has_mx(domain):
     try:
-        answers = dns.resolver.resolve(domain, 'MX')
-        return len(answers) > 0
-    except Exception:
+        records = dns.resolver.resolve(domain, 'MX')
+        return len(records) > 0
+    except:
         return False
 
-@app.route("/")
-def index():
-    return render_template("index.html")
-
-@app.route("/check", methods=["POST"])
+@app.route("/api/check", methods=["POST"])
 def check_email():
-    data = request.json
+    data = request.get_json()
     emails = data.get("emails", [])
-    results = []
 
+    results = []
     for email in emails:
         email = email.strip()
-        is_valid = bool(validate_email_syntax(email))
-        domain = email.split("@")[-1] if "@" in email else ""
-        mx_valid = has_mx_record(domain) if is_valid else False
+        status = {"email": email}
 
-        results.append({
-            "email": email,
-            "syntax": is_valid,
-            "mx": mx_valid
-        })
+        if not EMAIL_REGEX.match(email):
+            status["valid"] = False
+            status["reason"] = "Invalid Format"
+        else:
+            domain = email.split("@")[1]
+            if domain.lower() in DISPOSABLE_DOMAINS:
+                status["valid"] = False
+                status["reason"] = "Disposable Email"
+            elif not has_mx(domain):
+                status["valid"] = False
+                status["reason"] = "No MX Record"
+            else:
+                status["valid"] = True
+                status["reason"] = "Valid Email"
+
+        results.append(status)
 
     return jsonify(results)
 
