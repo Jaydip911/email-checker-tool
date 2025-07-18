@@ -16,8 +16,8 @@
     textarea {
       height: 150px;
     }
-    .result-table {
-      margin-top: 20px;
+    .download-btn {
+      display: none;
     }
   </style>
 </head>
@@ -35,10 +35,13 @@
       </div>
     </form>
 
-    <div id="results" class="result-table"></div>
+    <div id="results" class="result-table mt-4"></div>
+    <button id="downloadBtn" class="btn btn-success mt-3 download-btn" onclick="downloadCSV()">⬇️ Download CSV</button>
   </div>
 
   <script>
+    let lastResults = [];
+
     document.getElementById("emailForm").addEventListener("submit", async (e) => {
       e.preventDefault();
       const emailsText = document.getElementById("emailsInput").value;
@@ -51,8 +54,9 @@
       });
 
       const data = await response.json();
+      lastResults = data.results;
 
-      let resultHTML = `<table class="table table-bordered table-hover mt-4">
+      let resultHTML = `<table class="table table-bordered table-hover">
         <thead class="table-dark">
           <tr><th>Email</th><th>Valid MX</th><th>Disposable</th></tr>
         </thead><tbody>`;
@@ -67,11 +71,32 @@
 
       resultHTML += `</tbody></table>`;
       document.getElementById("results").innerHTML = resultHTML;
+      document.getElementById("downloadBtn").style.display = "inline-block";
     });
 
     function clearEmails() {
       document.getElementById("emailsInput").value = "";
       document.getElementById("results").innerHTML = "";
+      document.getElementById("downloadBtn").style.display = "none";
+      lastResults = [];
+    }
+
+    function downloadCSV() {
+      if (!lastResults.length) return;
+      const csvRows = [["Email", "Valid MX", "Disposable"]];
+      lastResults.forEach(r => {
+        csvRows.push([r.email, r.mx ? "Yes" : "No", r.disposable ? "Yes" : "No"]);
+      });
+
+      const csvContent = csvRows.map(e => e.join(",")).join("\n");
+      const blob = new Blob([csvContent], { type: "text/csv" });
+      const url = URL.createObjectURL(blob);
+
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "email_check_results.csv";
+      a.click();
+      URL.revokeObjectURL(url);
     }
   </script>
 </body>
