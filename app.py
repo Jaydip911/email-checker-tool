@@ -1,52 +1,54 @@
 from flask import Flask, request, jsonify
 import dns.resolver
 import re
-import json
 
 app = Flask(__name__)
 
+# Sample list of disposable email domains (you can expand this)
 DISPOSABLE_DOMAINS = set([
-    "mailinator.com", "10minutemail.com", "guerrillamail.com",
-    "tempmail.com", "yopmail.com", "trashmail.com", "sharklasers.com"
+    "mailinator.com", "10minutemail.com", "guerrillamail.com", "temp-mail.org",
+    "trashmail.com", "dispostable.com", "yopmail.com"
 ])
 
-EMAIL_REGEX = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+# Simple regex check
+def is_valid_syntax(email):
+    pattern = r"^[^@\s]+@[^@\s]+\.[^@\s]+$"
+    return re.match(pattern, email)
 
-def has_mx(domain):
+# MX Record check
+def has_mx_record(domain):
     try:
-        records = dns.resolver.resolve(domain, 'MX')
-        return len(records) > 0
-    except:
+        answers = dns.resolver.resolve(domain, 'MX')
+        return len(answers) > 0
+    except Exception:
         return False
 
-@app.route("/api/check", methods=["POST"])
+# Disposable domain check
+def is_disposable(email):
+    domain = email.split('@')[-1].lower()
+    return domain in DISPOSABLE_DOMAINS
+
+@app.route('/api/check', methods=['POST'])
 def check_email():
     data = request.get_json()
     emails = data.get("emails", [])
-
+    
     results = []
     for email in emails:
         email = email.strip()
-        status = {"email": email}
+        if not is_valid_syntax(email):
+            results.append({"email": email, "status": "Invalid Syntax"})
+            continue
 
-        if not EMAIL_REGEX.match(email):
-            status["valid"] = False
-            status["reason"] = "Invalid Format"
+        domain = email.split('@')[-1]
+        if is_disposable(email):
+            results.append({"email": email, "status": "Disposable"})
+        elif has_mx_record(domain):
+            results.append({"email": email, "status": "Valid (MX found)"})
         else:
-            domain = email.split("@")[1]
-            if domain.lower() in DISPOSABLE_DOMAINS:
-                status["valid"] = False
-                status["reason"] = "Disposable Email"
-            elif not has_mx(domain):
-                status["valid"] = False
-                status["reason"] = "No MX Record"
-            else:
-                status["valid"] = True
-                status["reason"] = "Valid Email"
+            results.append({"email": email, "status": "No MX Record"})
 
-        results.append(status)
-
-    return jsonify(results)
+    return jsonify({"results": results})
 
 if __name__ == "__main__":
     app.run(debug=True)
