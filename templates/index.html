@@ -53,4 +53,26 @@
       const data = await response.json();
 
       let resultHTML = `<table class="table table-bordered table-hover mt-4">
-        <thead c
+        <thead class="table-dark">
+          <tr><th>Email</th><th>Valid MX</th><th>Disposable</th></tr>
+        </thead><tbody>`;
+
+      data.results.forEach(result => {
+        resultHTML += `<tr>
+          <td>${result.email}</td>
+          <td>${result.mx ? '✅' : '❌'}</td>
+          <td>${result.disposable ? '🗑️ Yes' : 'No'}</td>
+        </tr>`;
+      });
+
+      resultHTML += `</tbody></table>`;
+      document.getElementById("results").innerHTML = resultHTML;
+    });
+
+    function clearEmails() {
+      document.getElementById("emailsInput").value = "";
+      document.getElementById("results").innerHTML = "";
+    }
+  </script>
+</body>
+</html>
