@@ -4,113 +4,79 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Email Checker Tool</title>
-
-  <!-- Bootstrap CSS -->
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
-
-  <!-- Your custom CSS (remove the inline <style> below if you add this file) -->
-  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
-
-  <!-- Inline CSS (only use this if not using style.css) -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet" />
   <style>
-    body {
-      background-color: #f8f9fa;
-    }
-    .container {
-      max-width: 800px;
-      margin-top: 50px;
-    }
-    textarea {
-      height: 150px;
-    }
-    .download-btn {
-      display: none;
-    }
+    body { background-color: #f8f9fa; }
+    .container { max-width: 800px; margin-top: 50px; }
+    textarea { height: 150px; }
+    .download-btn { display: none; }
   </style>
 </head>
 <body>
   <div class="container shadow p-4 bg-white rounded">
     <h2 class="text-center mb-4">🔍 Email Checker Tool</h2>
-
     <form id="emailForm">
       <div class="mb-3">
-        <textarea class="form-control" id="emailsInput" placeholder="Paste emails here (one per line or comma-separated)..."></textarea>
+        <textarea class="form-control" id="emailsInput" placeholder="Paste emails here..."></textarea>
       </div>
       <div class="d-flex justify-content-between">
         <button type="submit" class="btn btn-primary">Check Emails</button>
         <button type="button" class="btn btn-secondary" onclick="clearEmails()">Clear</button>
       </div>
     </form>
-
     <div id="results" class="result-table mt-4"></div>
     <button id="downloadBtn" class="btn btn-success mt-3 download-btn" onclick="downloadCSV()">⬇️ Download CSV</button>
   </div>
 
   <script>
     let lastResults = [];
-    // More JS will go here later
-  </script>
-</body>
-</html>
-
-  <script>
-    let lastResults = [];
-
-    document.getElementById("emailForm").addEventListener("submit", async (e) => {
+    document.getElementById('emailForm').addEventListener('submit', async function (e) {
       e.preventDefault();
-      const emailsText = document.getElementById("emailsInput").value;
-      const emailList = emailsText.split(/[\n,]+/).map(e => e.trim()).filter(Boolean);
+      const emails = document.getElementById('emailsInput').value
+        .split(/[\n,]+/)
+        .map(e => e.trim())
+        .filter(Boolean);
 
-      const response = await fetch("/api/check", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ emails: emailList })
+      const res = await fetch('/check', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ emails })
       });
-
-      const data = await response.json();
-      lastResults = data.results;
-
-      let resultHTML = `<table class="table table-bordered table-hover">
-        <thead class="table-dark">
-          <tr><th>Email</th><th>Valid MX</th><th>Disposable</th></tr>
-        </thead><tbody>`;
-
-      data.results.forEach(result => {
-        resultHTML += `<tr>
-          <td>${result.email}</td>
-          <td>${result.mx ? '✅' : '❌'}</td>
-          <td>${result.disposable ? '🗑️ Yes' : 'No'}</td>
-        </tr>`;
-      });
-
-      resultHTML += `</tbody></table>`;
-      document.getElementById("results").innerHTML = resultHTML;
-      document.getElementById("downloadBtn").style.display = "inline-block";
+      const data = await res.json();
+      lastResults = data;
+      displayResults(data);
     });
 
+    function displayResults(data) {
+      const table = `
+        <table class="table table-bordered">
+          <thead><tr><th>Email</th><th>Status</th></tr></thead>
+          <tbody>
+            ${data.map(d => `<tr><td>${d.email}</td><td>${d.status}</td></tr>`).join('')}
+          </tbody>
+        </table>
+      `;
+      document.getElementById('results').innerHTML = table;
+      document.getElementById('downloadBtn').style.display = 'inline-block';
+    }
+
     function clearEmails() {
-      document.getElementById("emailsInput").value = "";
-      document.getElementById("results").innerHTML = "";
-      document.getElementById("downloadBtn").style.display = "none";
-      lastResults = [];
+      document.getElementById('emailsInput').value = '';
+      document.getElementById('results').innerHTML = '';
+      document.getElementById('downloadBtn').style.display = 'none';
     }
 
     function downloadCSV() {
-      if (!lastResults.length) return;
-      const csvRows = [["Email", "Valid MX", "Disposable"]];
+      let csv = 'Email,Status\n';
       lastResults.forEach(r => {
-        csvRows.push([r.email, r.mx ? "Yes" : "No", r.disposable ? "Yes" : "No"]);
+        csv += `"${r.email}","${r.status}"\n`;
       });
-
-      const csvContent = csvRows.map(e => e.join(",")).join("\n");
-      const blob = new Blob([csvContent], { type: "text/csv" });
+      const blob = new Blob([csv], { type: 'text/csv' });
       const url = URL.createObjectURL(blob);
-
-      const a = document.createElement("a");
+      const a = document.createElement('a');
       a.href = url;
-      a.download = "email_check_results.csv";
+      a.download = 'email_results.csv';
       a.click();
-      URL.revokeObjectURL(url);
     }
   </script>
 </body>
